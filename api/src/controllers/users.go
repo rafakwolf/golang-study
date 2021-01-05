@@ -3,29 +3,43 @@ package controllers
 import (
 	"api/src/database"
 	"api/src/models"
+	"api/src/repositories"
+	"api/src/utils"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 )
 
 // CreateUser handles the user create route
 func CreateUser(w http.ResponseWriter, r *http.Request) {
-	reqBody, error := ioutil.ReadAll(r.Body)
+	reqBody, err := ioutil.ReadAll(r.Body)
 
-	if error != nil {
-		log.Fatal(error)
+	if err != nil {
+		utils.Error(w, http.StatusUnprocessableEntity, err)
+		return
 	}
 
 	var user models.User
-	if error = json.Unmarshal(reqBody, &user); error != nil {
-		log.Fatal(error)
+	if err = json.Unmarshal(reqBody, &user); err != nil {
+		utils.Error(w, http.StatusBadRequest, err)
+		return
 	}
 
-	db, error := database.Connect()
-	if error != nil {
-		log.Fatal(error)
+	db, err := database.Connect()
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, err)
+		return
 	}
+	defer db.Close()
+
+	repo := repositories.NewRepository(db)
+	userID, err := repo.Create(user)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	user.ID = userID
+	utils.JSON(w, http.StatusCreated, user)
 }
 
 // ListUsers retrieves all users from database
