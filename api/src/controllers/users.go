@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 )
 
 // CreateUser handles the user create route
@@ -21,6 +22,11 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 	if err = json.Unmarshal(reqBody, &user); err != nil {
+		utils.Error(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if err = user.Prepare(); err != nil {
 		utils.Error(w, http.StatusBadRequest, err)
 		return
 	}
@@ -44,7 +50,22 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // ListUsers retrieves all users from database
 func ListUsers(w http.ResponseWriter, r *http.Request) {
+	queryValue := strings.ToLower(r.URL.Query().Get("user"))
 
+	db, err := database.Connect()
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer db.Close()
+
+	repo := repositories.NewRepository(db)
+	users, err := repo.List(queryValue)
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, err)
+		return
+	}
+	utils.JSON(w, http.StatusOK, users)
 }
 
 // GetUser returns one user by its id
